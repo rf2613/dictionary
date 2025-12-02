@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Word of the Day</title>
+<style>
+  :root {
+    --bg: #fdf5f7;          /* soft blush background */
+    --card: #fefaf5;        /* light cream-beige card */
+    --accent: #f472b6;      /* pink accent */
+    --accent-soft: #fce7f3; /* softer pink */
+    --text-main: #4b5563;   /* slate text */
+    --muted: #9ca3af;       /* muted gray */
+    --border: #f5d0fe;      /* subtle border */
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: transparent; /* let Notion background show */
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+      sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+
+  .widget {
+    width: 260px;
+    background: var(--card);
+    border-radius: 18px;
+    padding: 18px 18px 16px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* subtle pink glow circle */
+  .widget::before {
+    content: "";
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle, var(--accent-soft), transparent 70%);
+    top: -40px;
+    right: -40px;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  .header {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-align: left;
+    margin-bottom: 6px;
+  }
+
+  .date-tag {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .word {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .pos {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .definition {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-main);
+    position: relative;
+    z-index: 1;
+  }
+
+  .footer-note {
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: right;
+    position: relative;
+    z-index: 1;
+  }
+
+  .loading {
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="widget">
+  <div class="header">Word of the Day</div>
+  <div id="date-tag" class="date-tag"></div>
+  <div id="word" class="word loading">Loading...</div>
+  <div id="pos" class="pos"></div>
+  <div id="definition" class="definition"></div>
+  <div class="footer-note">powered by dictionaryapi.dev</div>
+</div>
+
+<script>
+  // Your curated list of words (you can expand this)
+  const wordList = [
+    "serendipity",
+    "ethereal",
+    "tenacity",
+    "ephemeral",
+    "solace",
+    "luminous",
+    "novice",
+    "ubiquitous",
+    "amiable",
+    "resilient",
+    "catharsis",
+    "mellifluous",
+    "halcyon",
+    "eloquent",
+    "vivacious"
+  ];
+
+  // Simple daily index based on date
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const dateString = `${yyyy}-${mm}-${dd}`;
+
+  // show date (optional – you can remove this if you want it cleaner)
+  document.getElementById("date-tag").textContent = dateString;
+
+  // Use a deterministic index so same word shows all day
+  // (this is a simple hash-like formula)
+  const dayIndex = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+  const wordIndex = Math.abs(dayIndex) % wordList.length;
+  const todayWord = wordList[wordIndex];
+
+  const wordEl = document.getElementById("word");
+  const posEl = document.getElementById("pos");
+  const defEl = document.getElementById("definition");
+
+  // fallback definitions if API fails
+  const fallbackDefs = {
+    serendipity:
+      "The occurrence of events by chance in a happy or beneficial way.",
+    ethereal:
+      "Extremely delicate and light in a way that seems too perfect for this world.",
+    tenacity:
+      "Persistent determination in continuing something despite difficulty.",
+    ephemeral:
+      "Lasting for a very short time; fleeting.",
+    solace:
+      "Comfort or consolation in a time of distress or sadness.",
+    luminous:
+      "Emitting or reflecting light; bright or radiant.",
+    novice:
+      "A person new to or inexperienced in a field or situation.",
+    ubiquitous:
+      "Present, appearing, or found everywhere.",
+    amiable:
+      "Having or displaying a friendly and pleasant manner.",
+    resilient:
+      "Able to withstand or recover quickly from difficult conditions.",
+    catharsis:
+      "The process of releasing strong or repressed emotions.",
+    mellifluous:
+      "(Of a voice or words) sweet or musical; pleasant to hear.",
+    halcyon:
+      "Denoting a period of time in the past that was idyllically happy and peaceful.",
+    eloquent:
+      "Fluent or persuasive in speaking or writing.",
+    vivacious:
+      "(Especially of a woman) attractively lively and animated."
+  };
+
+  async function loadDefinition(word) {
+    wordEl.textContent = word.charAt(0).toUpperCase() + word.slice(1);
+    wordEl.classList.remove("loading");
+    posEl.textContent = "";
+    defEl.textContent = "Looking up definition…";
+
+    const apiUrl = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(
+      word.toLowerCase()
+    )}`;
+
+    try {
+      const res = await fetch(apiUrl);
+      if (!res.ok) {
+        throw new Error("API error");
+      }
+      const data = await res.json();
+
+      const entry = data[0];
+      const meaning = entry.meanings && entry.meanings[0];
+      const defs = meaning && meaning.definitions && meaning.definitions[0];
+
+      const partOfSpeech =
+        (meaning && meaning.partOfSpeech) || "word";
+      const definition =
+        (defs && defs.definition) ||
+        fallbackDefs[word.toLowerCase()] ||
+        "Definition unavailable at the moment.";
+
+      posEl.textContent = partOfSpeech;
+      defEl.textContent = definition;
+    } catch (e) {
+      // Fallback if API call fails
+      posEl.textContent = "";
+      defEl.textContent =
+        fallbackDefs[word.toLowerCase()] ||
+        "Definition unavailable at the moment.";
+    }
+  }
+
+  loadDefinition(todayWord);
+</script>
+
+</body>
+</html>
